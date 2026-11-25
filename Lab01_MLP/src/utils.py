@@ -1,8 +1,17 @@
 import torch
 import torch.nn as nn
+import torchvision
 import numpy as np
 from src.config import OPTIMIZER_DICT
 from torch.utils.data import TensorDataset
+import matplotlib.pyplot as plt
+
+def get_dataset(train=False):
+    return torchvision.datasets.MNIST(
+        root='./data',
+        train=train,
+        download=True
+)
 
 def preprocess(raw_dataset):
 
@@ -75,6 +84,15 @@ def evaluation(model, dataset):
     accuracy = no_correct/len(dataset)*100.00
 
     return accuracy
+
+def plot_loss(loss, epochs, title):
+    plt.figure()
+    plt.plot(loss)
+    plt.title(title)
+    plt.xticks(ticks=np.arange(0, stop=epochs, step=5))
+    plt.xlabel("Epochs")
+    plt.ylabel("Mean loss")
+    plt.show()
 
 
 
