@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from torch.utils.data import TensorDataset, DataLoader
+from src.config import EPOCHS, BATCH_SIZE, LR, OPTIMIZER_DICT, OPTIM
+from src.utils import train, evaluation, preprocess
 
 ########### NEURAL NET DEFINITION ##############
 
@@ -43,120 +45,42 @@ dataset_train = torchvision.datasets.MNIST(
     download=True
 )
 
-labels = np.array([data[1] for data in dataset_train])
+dataset = preprocess(dataset_train)
 
-y_train = pd.DataFrame(labels)
-
-############### PRE-PROCESSING ######################
-
-data_matrices = [np.array(data[0]) for data in dataset_train]
-
-# Flatten process
-X_train = [matrix.flatten() for matrix in data_matrices]
-
-print(y_train)
-
-X_train = np.array(X_train)/255
-
-# To Numpy
-y_train = y_train.squeeze().values
-
-# To Torch.Dataset
-X_train = torch.tensor(X_train, dtype=torch.float32)
-y_train = torch.tensor(y_train, dtype=torch.int64)
-
-dataset = TensorDataset(X_train, y_train)
-batches = DataLoader(dataset, batch_size=64, shuffle=True)
-
+batches = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 model = NeuralNetMLP()
 print(model)
 
 ########## TRAINING ###############
 
-# Initializing optimizer
-optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+loss = train(model=model, lr=LR, optim_name=OPTIM, epochs=EPOCHS, batches=batches)
 
-# Initializing loss criterion
-criterion = nn.CrossEntropyLoss()
-
-
-epochs = 20
-model.train()
-no_correct = 0
-for epoch in range(epochs):
-  for X_train, y_train in batches:
-    # Resets gradients
-    optimizer.zero_grad()
-
-    # Forward pass
-    output = model(X_train)
-
-    # Computing loss
-    loss = criterion(output, y_train)
-
-    # Backward
-    loss.backward()
-
-    # Updates params
-    optimizer.step()
-
-  if ((epoch == 0) or ((epoch+1)%5 == 0)):
-    print(f"Epoch {epoch + 1}. Loss: {loss:.4f}")
-
-# Train accuracy
-model.eval()
+plt.figure()
+plt.plot(loss)
+plt.title("Training loss")
+plt.xticks(ticks=np.arange(0, stop=EPOCHS, step=5))
+plt.xlabel("Epochs")
+plt.ylabel("Mean loss")
+plt.show()
 
 ############# EVALUATION ###############
 
-softmax_layer = nn.Softmax(dim=-1)
+# Train evaluation
 
-no_correct = 0
-
-for X_train, y_train in dataset:
-  with torch.no_grad():
-    output_logit = model(X_train)
-    output = softmax_layer(output_logit)
-
-    if (torch.argmax(output) == y_train):
-      no_correct += 1
-
-print(f"Accuracy: {no_correct/len(dataset)*100.00} %")
+accuracy = evaluation(model, dataset)
+print(f"Train accuracy: {accuracy:.2f}%")
 
 # Preparing test data
 
-dataset_test = torchvision.datasets.MNIST(
+test_dataset = torchvision.datasets.MNIST(
     root='./data',
     train=False,
     download=True
 )
 
-# To Numpy
-test_input = [np.array(matrix).flatten() for matrix, _ in dataset_test]
-test_input = np.array(test_input)/255
+test_dataset = preprocess(test_dataset)
 
-labels = [label for _, label in dataset_test]
+accuracy = evaluation(model, test_dataset)
 
-# To torch.tensor
-test_input = torch.tensor(test_input, dtype=torch.float32)
-labels = torch.tensor(labels, dtype=torch.int64)
-
-# To dataset
-
-test_dataset = TensorDataset(test_input, labels)
-
-model.eval()
-
-softmax_layer = nn.Softmax(dim=-1)
-
-no_correct = 0
-
-for X_test, label_test in test_dataset:
-  with torch.no_grad():
-    output_logit = model(X_test)
-    output = softmax_layer(output_logit)
-
-    if (torch.argmax(output).item() == label_test):
-      no_correct += 1
-
-print(f"Accuracy: {no_correct/len(test_dataset)*100.00} %")
+print(f"Test accuracy: {accuracy:.2f} %")
