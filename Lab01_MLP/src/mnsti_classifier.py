@@ -1,37 +1,45 @@
 
-from torch.utils.data import TensorDataset, DataLoader
-from src.config import EPOCHS, BATCH_SIZE, LR, OPTIM
-from src.utils import get_dataset, train, evaluation, preprocess, plot_loss
+import torch
+from torch.utils.data import DataLoader, Subset
+from src.utils import get_dataset, train, evaluation, preprocess
 from src.NeuralNetMLP import NeuralNetMLP
 
-dataset_train = get_dataset(train=True)
+def run_pipeline(batch_size, lr, optim_name, size_train, epochs):
 
-dataset = preprocess(dataset_train)
+    torch.manual_seed(seed=56)
 
-batches = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
+    dataset_train = get_dataset(train=True)
 
-model = NeuralNetMLP()
+    dataset_train = preprocess(dataset_train)
 
-########## TRAINING ###############
+    dataset_validation = Subset(dataset_train, range(len(dataset_train) - 10000, len(dataset_train)))
+    dataset_train = Subset(dataset_train, range(0,size_train))
 
-train_loss = train(model=model, lr=LR, optim_name=OPTIM, epochs=EPOCHS, batches=batches)
+    train_batches = DataLoader(dataset_train, batch_size=batch_size, shuffle=True)
 
-############# EVALUATION ###############
+    model = NeuralNetMLP()
 
-# Train evaluation
+    ########## TRAINING ###############
 
-accuracy = evaluation(model, dataset)
-print(f"Train accuracy: {accuracy:.2f}%")
+    train_loss, val_loss = train(model=model, lr=lr, optim_name=optim_name, epochs=epochs,
+                                 batches=train_batches,
+                                 validation_dataset=dataset_validation)
 
-# Test evaluation
+    ############# EVALUATION ##########
 
-test_dataset = get_dataset(train=False)
+    # Train evaluation
 
-test_dataset = preprocess(test_dataset)
+    train_accuracy = evaluation(model, dataset_train)
+    print(f"Train accuracy: {train_accuracy:.2f}%")
 
-accuracy = evaluation(model, test_dataset)
+    # Test evaluation
 
-print(f"Test accuracy: {accuracy:.2f} %")
+    test_dataset = get_dataset(train=False)
 
-####### Plots ##########
-plot_loss(train_loss, epochs=EPOCHS, title="Train loss")
+    test_dataset = preprocess(test_dataset)
+
+    test_accuracy = evaluation(model, test_dataset)
+
+    print(f"Test accuracy: {test_accuracy:.2f}%")
+
+    return train_loss, val_loss, train_accuracy, test_accuracy
